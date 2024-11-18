@@ -2,11 +2,11 @@ CC = gcc
 CFLAGS = -Wall -g -pthread
 
 # Source files
-SRCS = main.c
+SRCS = main.c helpers.c log.c
 OBJS = $(SRCS:.c=.o)
 
-# Header files
-# HEADERS = seating.h log.h
+# Header files 
+HEADERS = seating.h structs.h helpers.h log.h
 
 # Target executable
 TARGET = dineseating

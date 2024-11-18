@@ -1,0 +1,33 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Build with Make",
+            "command": "make",
+            "args": ["-s 20"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Builds project using Makefile"
+        },
+        {
+            "type": "shell",
+            "label": "Clean with Make",
+            "command": "make",
+            "args": ["clean"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "detail": "Cleans build files using Makefile"
+        }
+    ],
+    "version": "2.0.0"
+}

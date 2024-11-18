@@ -35,7 +35,7 @@ void output_request_added (RequestType type,
  * 
  * Counts reflect numbers *after* the request has been removed
  */
-void output_request_removed(Consumers consumers, RequestType type, 
+void output_request_removed(int consumers, RequestType type, 
                             unsigned int consumed[], unsigned int inRequestQueue[]);
 
 /**
