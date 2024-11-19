@@ -135,7 +135,6 @@ void* general_greeter(void* args) {
             nanosleep(&ts, NULL);
         }
 
-        // now lock/wait for the queue once we have read in from the line outside
         pthread_mutex_lock(queue_mutex);
 
         if(check_if_total_count_is_reached(request_queue, total_requests)){
