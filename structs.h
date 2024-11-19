@@ -6,7 +6,7 @@
 
 
 typedef struct Queue {
-       RequestType *requests;        
+       RequestType *requests;
        int count;                     
        int vip_count;                
        int normal_count;              
@@ -25,8 +25,12 @@ struct greeter_args {
     int* time;
     int* vip_time;
     pthread_mutex_t* queue_mutex;
-    pthread_mutex_t* line_outside_mutex;
-    int greeter_id;
+    int customer_type;
+    int* total_requests;
+
+    pthread_mutex_t* barrier;
+    int* threads_completed;
+    pthread_cond_t* barrier_cond;
 };
 
 struct concierge_args {
@@ -34,8 +38,9 @@ struct concierge_args {
     int* time;
     pthread_mutex_t* queue_mutex;
     int id;
-    pthread_mutex_t* barrier;
     int* total_requests;
+
+    pthread_mutex_t* barrier;
     int* threads_completed;
     pthread_cond_t* barrier_cond;
 };

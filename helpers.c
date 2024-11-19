@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <time.h>
 #define MAX_VIP 6
 #define max_QUEUE_SIZE 18
 
@@ -51,7 +52,22 @@ void print_queue(Queue* queue){
     printf("\n");
 }
 
+int check_if_total_count_is_reached(Queue* queue, int total_requests){
+    return queue->total_normal_count + queue->total_vip_count >= total_requests;
+}
+
+int check_if_queue_has_been_consumed(Queue* queue, int total_requests){
+    int total_consumed = queue->consumed[0][0] + queue->consumed[0][1] + 
+                        queue->consumed[1][0] + queue->consumed[1][1];
+    return total_consumed >= total_requests && queue->total_normal_count + queue->total_vip_count >= total_requests;
+}
+
 RequestType pop_from_queue(Queue* queue) {
+    if(queue->count <= 0){
+        // throw an error
+        printf("attempting to pop from Queue when empty\n");
+        exit(1);
+    }
     RequestType request = queue->requests[0];
     for (int i = 0; i < queue->count - 1; i++) {
         queue->requests[i] = queue->requests[i + 1];
@@ -63,6 +79,18 @@ RequestType pop_from_queue(Queue* queue) {
         queue->normal_count--;
     }
     queue->count--;
+
+    if(queue->vip_count < 0){
+        // throw an error
+        printf("VIP count is less than 0\n");
+        exit(1);
+    }
+
+    if(queue->normal_count < 0){
+        // throw an error
+        printf("Normal count is less than 0\n");
+        exit(1);
+    }
 
     //printf("Popped from queue: %d\n", request);
 
@@ -76,81 +104,73 @@ int is_empty(Queue* queue) {
 // robots
 
 void* general_greeter(void* args) {
-
-    
     // cast the args to the correct type
     struct greeter_args* greeter_args = (struct greeter_args*)args;
-    Queue* line_outside_queue = greeter_args->line_queue;
+    //Queue* line_outside_queue = greeter_args->line_queue;
     int time = *greeter_args->time;
     int vip_time = *greeter_args->vip_time;
     pthread_mutex_t *queue_mutex = greeter_args->queue_mutex;
-    pthread_mutex_t *line_outside_mutex = greeter_args->line_outside_mutex;
-    //int greeter_id = greeter_args->greeter_id;
+    int customer_type = greeter_args->customer_type;
     Queue* request_queue = greeter_args->queue;
+    int total_requests = *greeter_args->total_requests;
+    pthread_mutex_t* barrier = greeter_args->barrier;
+    int* threads_completed = greeter_args->threads_completed;
+    pthread_cond_t* barrier_cond = greeter_args->barrier_cond;
 
     //printf("General greeter %d is running\n", greeter_id);
     
     while (1) {
 
-        //lock the line outside mutex
-        pthread_mutex_lock(line_outside_mutex);
-
-        if (is_empty(line_outside_queue)) {
-            //printf("General greeter %d: No more customers in line\n", greeter_id);
-            //printf("General greeter %d: Count of the queue: %d\n", greeter_id, request_queue->count);
-            pthread_mutex_unlock(line_outside_mutex);
-
-            // get the line outside mutex value
-            // int line_outside_mutex_value;
-            // sem_getvalue(line_outside_mutex, &line_outside_mutex_value);
-            // printf("General greeter %d: Line outside mutex value: %d\n", greeter_id, line_outside_mutex_value);
-            // int queue_mutex_value;
-            // sem_getvalue(queue_mutex, &queue_mutex_value);
-            // printf("General greeter %d: Queue mutex value: %d\n", greeter_id, queue_mutex_value);
-            // printf("General greeter %d: Is empty: %d\n", greeter_id, is_empty(line_outside_queue));
-
-            break;  // Exit if no more customers
-        }
-
-        RequestType customer_type = pop_from_queue(line_outside_queue);
         if(customer_type == VIPRoom){
-            usleep(vip_time);
+            struct timespec ts = {
+                .tv_sec = vip_time / 1000,
+                .tv_nsec = (vip_time % 1000) * 1000000
+            };
+            nanosleep(&ts, NULL);
         } else {
-            usleep(time);
+            struct timespec ts = {
+                .tv_sec = time / 1000,
+                .tv_nsec = (time % 1000) * 1000000
+            };
+            nanosleep(&ts, NULL);
         }
-
-        // unlock the line outside mutex
-        pthread_mutex_unlock(line_outside_mutex);
-
-        //-----------------------------
 
         // now lock/wait for the queue once we have read in from the line outside
         pthread_mutex_lock(queue_mutex);
 
+        if(check_if_total_count_is_reached(request_queue, total_requests)){
+            pthread_mutex_unlock(queue_mutex);
+            break;
+        }
+
+        if(check_if_queue_has_been_consumed(request_queue, total_requests)){
+            pthread_mutex_unlock(queue_mutex);
+            break;
+        }
 
         //wait for the queue to have a spot if its full
         while (request_queue->count >= max_QUEUE_SIZE) {
             pthread_mutex_unlock(queue_mutex);
-            usleep(time);
-            pthread_mutex_lock(queue_mutex);
-        }
-
-        // wait for the queue to have a spot if the normal count is greater than 12 and our request is not a vip
-        while (request_queue->normal_count >= 13 && customer_type != VIPRoom) {
-            pthread_mutex_unlock(queue_mutex);
-            usleep(time);
+            struct timespec ts = {
+                .tv_sec = time / 1000,
+                .tv_nsec = (time % 1000) * 1000000
+            };
+            nanosleep(&ts, NULL);
             pthread_mutex_lock(queue_mutex);
         }
 
         // wait for the queue to have a spot if the vip count is greater than 4 and our request is not a vip
-        while (request_queue->vip_count >= 5 && customer_type != VIPRoom) {
+        while (request_queue->vip_count >= 5 && customer_type == 1) {
             pthread_mutex_unlock(queue_mutex);
-            usleep(time);
+            struct timespec ts = {
+                .tv_sec = time / 1000,
+                .tv_nsec = (time % 1000) * 1000000
+            };
+            nanosleep(&ts, NULL);
             pthread_mutex_lock(queue_mutex);
         }
 
-
-        // for now we print instead of pushing to the real queue
+        // for now we print
         // printf("General greeter %d met and pushed to queue customer of type: %d\n ", greeter_id, customer_type);
 
         push_to_queue(request_queue, customer_type);
@@ -158,12 +178,24 @@ void* general_greeter(void* args) {
         unsigned int produced[] = {request_queue->total_normal_count, request_queue->total_vip_count};
         unsigned int inRequestQueue[] = {request_queue->normal_count, request_queue->vip_count};
 
+        //printf("%d, %d\n", inRequestQueue[0], inRequestQueue[1]);
         output_request_added(customer_type, produced, inRequestQueue);
+
+        if(check_if_total_count_is_reached(request_queue, total_requests)){
+            pthread_mutex_unlock(queue_mutex);
+            break;
+        }
 
         // unlock the queue once we are done working with it
         pthread_mutex_unlock(queue_mutex);
         
     }
+
+    pthread_mutex_lock(barrier);
+    (*threads_completed)++;
+    pthread_cond_signal(barrier_cond);
+    pthread_mutex_unlock(barrier);
+
     return NULL;
 }
 
@@ -182,26 +214,27 @@ void* concierge_robot(void* args){
 
     //unsigned int consumedCounts[] = {0, 0};
 
-    while(1){
-        // lock the queue
+    while(1){        
+        struct timespec ts = {
+            .tv_sec = sleep_time / 1000,
+            .tv_nsec = (sleep_time % 1000) * 1000000
+        };
+        nanosleep(&ts, NULL);
+
+        //lock the queue
         pthread_mutex_lock(queue_mutex);
-        usleep(sleep_time);
 
         // check that the queue is not empty
         if (is_empty(queue)) {
-            pthread_mutex_unlock(queue_mutex);
-
-            // check if all the requests have been consumed and counts are zero, if so signal the barrier to be unlocked and increment the threads completed count 
-            if(*total_requests == queue->consumed[0][0] + queue->consumed[0][1] + queue->consumed[1][0] + queue->consumed[1][1] && queue->count == 0 && queue->vip_count == 0 && queue->normal_count == 0){
-                pthread_mutex_lock(barrier);
-                (*threads_completed)++;
-                pthread_cond_signal(barrier_cond);
-                pthread_mutex_unlock(barrier);
+            // Check completion while still holding the mutex
+            if(check_if_queue_has_been_consumed(queue, *total_requests)){
+                pthread_mutex_unlock(queue_mutex);
+                break;
             }
-
+            pthread_mutex_unlock(queue_mutex);
             continue;
         }
-
+        
         // pop from the queue
         RequestType request = pop_from_queue(queue);
         if(request == VIPRoom){
@@ -210,27 +243,18 @@ void* concierge_robot(void* args){
             queue->consumed[id][0]++;
         }
 
-        // unlock the queue
-        pthread_mutex_unlock(queue_mutex);
-
         unsigned int normalAndVIPCounts[] = {queue->normal_count, queue->vip_count};
         output_request_removed(id, request, queue->consumed[id], normalAndVIPCounts);
 
-        // check if all the requests have been consumed and counts are zero, if so signal the barrier to be unlocked and increment the threads completed count 
-        if(*total_requests == queue->consumed[0][0] + queue->consumed[0][1] + queue->consumed[1][0] + queue->consumed[1][1] && queue->count == 0 && queue->vip_count == 0 && queue->normal_count == 0){
-            pthread_mutex_lock(barrier);
-            (*threads_completed)++;
-            pthread_cond_signal(barrier_cond);
-            pthread_mutex_unlock(barrier);
-        }
+        // unlock the queue
+        pthread_mutex_unlock(queue_mutex);
 
-        //check the type of request for now just print
-        // if(request == VIPRoom){
-        //     printf("Concierge robot %d has seated VIP customer\n", greeter_id);
-        // } else {
-        //     printf("Concierge robot %d has seated Normal customer\n", greeter_id);
-        // }
     }
+    
+    pthread_mutex_lock(barrier);
+    (*threads_completed)++;
+    pthread_cond_signal(barrier_cond);
+    pthread_mutex_unlock(barrier);
 
     return NULL;
 }
