@@ -101,6 +101,22 @@ int is_empty(Queue* queue) {
     return queue->count == 0;
 }
 
+void general_greeter_sleep(int time, int vip_time, int customer_type){
+    if(customer_type == VIPRoom){
+        struct timespec ts = {
+            .tv_sec = vip_time / 1000,
+            .tv_nsec = (vip_time % 1000) * 1000000
+        };
+        nanosleep(&ts, NULL);
+    } else {
+        struct timespec ts = {
+            .tv_sec = time / 1000,
+            .tv_nsec = (time % 1000) * 1000000
+        };
+        nanosleep(&ts, NULL);
+    }
+}
+
 // robots
 
 void* general_greeter(void* args) {
@@ -121,19 +137,6 @@ void* general_greeter(void* args) {
     
     while (1) {
 
-        if(customer_type == VIPRoom){
-            struct timespec ts = {
-                .tv_sec = vip_time / 1000,
-                .tv_nsec = (vip_time % 1000) * 1000000
-            };
-            nanosleep(&ts, NULL);
-        } else {
-            struct timespec ts = {
-                .tv_sec = time / 1000,
-                .tv_nsec = (time % 1000) * 1000000
-            };
-            nanosleep(&ts, NULL);
-        }
 
         pthread_mutex_lock(queue_mutex);
 
@@ -150,22 +153,14 @@ void* general_greeter(void* args) {
         //wait for the queue to have a spot if its full
         while (request_queue->count >= max_QUEUE_SIZE) {
             pthread_mutex_unlock(queue_mutex);
-            struct timespec ts = {
-                .tv_sec = time / 1000,
-                .tv_nsec = (time % 1000) * 1000000
-            };
-            nanosleep(&ts, NULL);
+            general_greeter_sleep(time, vip_time, customer_type);
             pthread_mutex_lock(queue_mutex);
         }
 
         // wait for the queue to have a spot if the vip count is greater than 4 and our request is not a vip
         while (request_queue->vip_count >= 5 && customer_type == 1) {
             pthread_mutex_unlock(queue_mutex);
-            struct timespec ts = {
-                .tv_sec = time / 1000,
-                .tv_nsec = (time % 1000) * 1000000
-            };
-            nanosleep(&ts, NULL);
+            general_greeter_sleep(time, vip_time, customer_type);
             pthread_mutex_lock(queue_mutex);
         }
 
@@ -185,9 +180,15 @@ void* general_greeter(void* args) {
             break;
         }
 
+        if(check_if_queue_has_been_consumed(request_queue, total_requests)){
+            pthread_mutex_unlock(queue_mutex);
+            break;
+        }
+
         // unlock the queue once we are done working with it
         pthread_mutex_unlock(queue_mutex);
         
+        general_greeter_sleep(time, vip_time, customer_type);
     }
 
     pthread_mutex_lock(barrier);
@@ -214,14 +215,14 @@ void* concierge_robot(void* args){
     //unsigned int consumedCounts[] = {0, 0};
 
     while(1){        
-        struct timespec ts = {
-            .tv_sec = sleep_time / 1000,
-            .tv_nsec = (sleep_time % 1000) * 1000000
-        };
-        nanosleep(&ts, NULL);
 
         //lock the queue
         pthread_mutex_lock(queue_mutex);
+
+        if(check_if_queue_has_been_consumed(queue, *total_requests)){
+            pthread_mutex_unlock(queue_mutex);
+            break;
+        }
 
         // check that the queue is not empty
         if (is_empty(queue)) {
@@ -248,6 +249,7 @@ void* concierge_robot(void* args){
         // unlock the queue
         pthread_mutex_unlock(queue_mutex);
 
+        general_greeter_sleep(sleep_time, 0, 0);
     }
     
     pthread_mutex_lock(barrier);

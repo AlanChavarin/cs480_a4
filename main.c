@@ -12,10 +12,10 @@
 
 int main(int argc, char **argv) {
     int total_requests = 120; // total number of seating requests
-    int tx_time = 0; // time that TX robot uses on average for processing a seatign request. simulate this time for the tx robot to consume this request via sleeping for this many milliseconds
-    int rev9_time = 0; // same as above 
-    int general_time = 0; // time in miliseconds for the general greeter robot to insert a general table request
-    int vip_time = 0; // time for the vip room greeter robot to insert into the vip room 
+    double tx_time = 0.0; // time that TX robot uses on average for processing a seatign request. simulate this time for the tx robot to consume this request via sleeping for this many milliseconds
+    double rev9_time = 0.0; // same as above 
+    double general_time = 0.0; // time in miliseconds for the general greeter robot to insert a general table request
+    double vip_time = 0.0; // time for the vip room greeter robot to insert into the vip room 
     
     int opt;
     while ((opt = getopt(argc, argv, "s:x:r:g:v:")) != -1) {

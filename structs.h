@@ -22,8 +22,8 @@ typedef struct Queue {
 struct greeter_args {
     Queue* line_queue;
     Queue* queue;
-    int* time;
-    int* vip_time;
+    double* time;
+    double* vip_time;
     pthread_mutex_t* queue_mutex;
     int customer_type;
     int* total_requests;
@@ -35,7 +35,7 @@ struct greeter_args {
 
 struct concierge_args {
     Queue* queue;
-    int* time;
+    double* time;
     pthread_mutex_t* queue_mutex;
     int id;
     int* total_requests;
